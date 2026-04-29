@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1a237e; 
+      --secondary: #00c853; 
+      --bg-color: #f0f2f5;
+      --glass: rgba(255, 255, 255, 0.9);
+    }
+
+    body { 
+      background-color: var(--bg-color);
+      background-image: radial-gradient(circle at 10% 20%, rgba(26, 35, 126, 0.05) 0%, transparent 20%);
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      margin: 0;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, var(--primary) 0%, #3949ab 100%);
+      color: white;
+      padding: 40px 20px;
+      border-radius: 0 0 30px 30px;
+      margin-bottom: -50px;
+      box-shadow: 0 10px 30px rgba(26, 35, 126, 0.2);
+    }
+
+    .main-container {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .btn-scan {
+      background: var(--secondary);
+      color: white;
+      border: none;
+      border-radius: 18px;
+      padding: 18px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      width: 100%;
+      box-shadow: 0 8px 20px rgba(0, 200, 83, 0.3);
+      transition: all 0.3s ease;
+      margin-bottom: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .card {
+      background: var(--glass);
+      backdrop-filter: blur(10px);
+      border-radius: 25px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+      padding: 30px;
+    }
+
+    .form-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--primary);
+      margin-left: 5px;
+    }
+
+    .form-control, .form-select {
+      border-radius: 12px;
+      border: 2px solid #e0e0e0;
+      padding: 12px 15px;
+    }
+
+    .btn-submit {
+      background: var(--primary);
+      color: white;
+      border-radius: 15px;
+      padding: 14px;
+      font-weight: 600;
+      width: 100%;
+      border: none;
+      margin-top: 10px;
+    }
+
+    #qrResult {
+      display: none;
+      text-align: center;
+      animation: slideUp 0.6s ease-out;
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .qr-frame {
+      background: white;
+      padding: 15px;
+      border-radius: 20px;
+      display: inline-block;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header-banner text-center">
+    <h3 class="fw-bold m-0">🏫 Chester Palmer</h3>
+    <p class="small opacity-75">Registro de Estudiantes</p>
+  </div>
+
+  <div class="main-container">
+    <button class="btn-scan" onclick="abrirEscaner()">
+      <i class="fa-solid fa-qrcode"></i> ESCÁNER EN TIEMPO REAL
+    </button>
+
+    <div class="card" id="formCard">
+      <div class="mb-3 text-primary">
+        <i class="fa-solid fa-pen-to-square"></i> <span class="fw-bold">Nuevo Ingreso</span>
+      </div>
+      
+      <!-- Nombre -->
+      <div class="mb-3">
+        <label class="form-label">Nombre Completo</label>
+        <input type="text" id="nom" class="form-control" placeholder="Ej: Emmanuel Silva">
+      </div>
+
+      <!-- Grado con diferenciación -->
+      <div class="mb-3">
+        <label class="form-label">Grado Escolar</label>
+        <select id="gra" class="form-select">
+          <option value="" selected disabled>Selecciona el nivel...</option>
+          <optgroup label="Sección Primaria">
+            <option value="1° Primaria">1° Primaria</option>
+            <option value="2° Primaria">2° Primaria</option>
+            <option value="3° Primaria">3° Primaria</option>
+            <option value="4° Primaria">4° Primaria</option>
+            <option value="5° Primaria">5° Primaria</option>
+          </optgroup>
+          <optgroup label="Sección Bachillerato">
+            <option value="6° Bachillerato">6° Bachillerato</option>
+            <option value="7° Bachillerato">7° Bachillerato</option>
+            <option value="8° Bachillerato">8° Bachillerato</option>
+            <option value="9° Bachillerato">9° Bachillerato</option>
+            <option value="10° Bachillerato">10° Bachillerato</option>
+            <option value="11° Bachillerato">11° Bachillerato</option>
+          </optgroup>
+        </select>
+      </div>
+
+      <!-- Correo -->
+      <div class="mb-4">
+        <label class="form-label">Email del Acudiente</label>
+        <input type="email" id="cor" class="form-control" placeholder="ejemplo@correo.com">
+      </div>
+
+      <button class="btn btn-submit" id="btnReg" onclick="registrar()">
+        GUARDAR Y GENERAR QR
+      </button>
+    </div>
+
+    <!-- Pantalla de éxito -->
+    <div class="card" id="qrResult">
+      <div class="text-success mb-2">
+        <i class="fa-solid fa-check-circle fa-3x"></i>
+      </div>
+      <h4 class="fw-bold">¡Registrado!</h4>
+      <p id="alumnoNombre" class="text-muted mb-0"></p>
+      
+      <div class="qr-frame">
+        <img id="qrImg" src="" style="width: 180px; height: 180px;">
+      </div>
+      
+      <p class="small text-muted">ID Institucional: <span id="alumnoId" class="fw-bold text-dark"></span></p>
+      <button class="btn btn-outline-primary w-100 rounded-pill mt-2" onclick="location.reload()">
+        Nuevo Registro
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // 🔧 CAMBIO ÚNICO: pega aquí la URL de tu GitHub Pages cuando la tengas lista
+    const URL_ESCANER = "https://asistech12345.github.io/escaner-cps/";
+
+    function abrirEscaner() {
+      // Abre el escáner externo (fuera del iframe de Apps Script para que la cámara funcione)
+      window.top.location.href = URL_ESCANER;
+    }
+
+    function registrar() {
+      const btn = document.getElementById('btnReg');
+      const datos = {
+        nombre: document.getElementById('nom').value,
+        grado: document.getElementById('gra').value,
+        correo: document.getElementById('cor').value
+      };
+
+      if(!datos.nombre || !datos.grado || !datos.correo) {
+        return alert("Por favor, completa todos los campos del formulario.");
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Procesando...';
+
+      google.script.run.withSuccessHandler(res => {
+        if(res.status === "success") {
+          document.getElementById('formCard').style.display = 'none';
+          document.getElementById('qrResult').style.display = 'block';
+          document.getElementById('qrImg').src = res.qr;
+          document.getElementById('alumnoNombre').innerText = res.nombre;
+          document.getElementById('alumnoId').innerText = res.id;
+        } else {
+          alert("Error: " + res.message);
+          btn.disabled = false;
+          btn.innerHTML = "GUARDAR Y GENERAR QR";
+        }
+      }).registrarAlumno(datos);
+    }
+  </script>
+</body>
+</html>
