@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <base target="_top">
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Escáner Chester Palmer</title>
   <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
@@ -15,7 +16,7 @@
       position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%);
       border: 3px solid rgba(0,255,0,0.6);
-      width: 220px; height: 220px;
+      width: 240px; height: 240px;
       border-radius: 20px; pointer-events: none;
       box-shadow: 0 0 0 9999px rgba(0,0,0,0.35);
     }
@@ -35,13 +36,33 @@
   </div>
 
   <script>
-    const codeReader = new ZXing.BrowserMultiFormatReader();
+    // 🔧 PEGA AQUÍ TU URL /exec DE APPS SCRIPT
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyVFtqSlMDImC75d14U4319Eciri7DpLOytYkGHdrdS82nD1M3pRM056j5IuOSytN9FLQ/exec";
+
+    // Configura el lector con escaneo más rápido
+    const hints = new Map();
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.QR_CODE]);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    const codeReader = new ZXing.BrowserMultiFormatReader(hints, 100); // 100ms entre intentos
+
     const status = document.getElementById('status');
     const btnIniciar = document.getElementById('btnIniciar');
 
-    let leyendo = false;       // candado para evitar lecturas duplicadas
-    let ultimoCodigo = null;   // último QR procesado
-    let ultimoTs = 0;          // timestamp de la última lectura
+    let leyendo = false, ultimoCodigo = null, ultimoTs = 0;
+
+    // Beep al leer correctamente
+    function beep() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = 880; osc.type = 'sine';
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+        osc.start(); osc.stop(ctx.currentTime + 0.2);
+      } catch(e) {}
+    }
 
     function setStatus(texto, clase) {
       status.className = (clase || 'text-warning') + ' mb-2';
@@ -52,7 +73,6 @@
       const ahora = Date.now();
       const texto = result.getText();
 
-      // Anti-rebote: ignorar el mismo código si llega < 3s después
       if (leyendo) return;
       if (texto === ultimoCodigo && (ahora - ultimoTs) < 3000) return;
 
@@ -60,26 +80,30 @@
       ultimoCodigo = texto;
       ultimoTs = ahora;
 
+      beep();
       if (navigator.vibrate) navigator.vibrate(120);
       setStatus('✅ Leído, validando...', 'text-info');
 
-      google.script.run
-        .withSuccessHandler(res => {
-          if (res && res.status === 'success') {
-            setStatus('🟢 BIENVENIDO: ' + res.nombre, 'text-success');
-          } else {
-            setStatus('🔴 ID DESCONOCIDO', 'text-danger');
-          }
-          setTimeout(() => {
-            leyendo = false;
-            setStatus('📸 Enfoca el siguiente QR', 'text-warning');
-          }, 2000);
-        })
-        .withFailureHandler(e => {
-          setStatus('⚠️ Error de red: ' + (e && e.message ? e.message : e), 'text-danger');
-          setTimeout(() => { leyendo = false; }, 2000);
-        })
-        .marcarAsistencia(texto);
+      fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify({ id: texto })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res && res.status === 'success') {
+          setStatus('🟢 BIENVENIDO: ' + res.nombre, 'text-success');
+        } else {
+          setStatus('🔴 ID DESCONOCIDO', 'text-danger');
+        }
+        setTimeout(() => {
+          leyendo = false;
+          setStatus('📸 Enfoca el siguiente QR', 'text-warning');
+        }, 2000);
+      })
+      .catch(e => {
+        setStatus('⚠️ Error de red: ' + e.message, 'text-danger');
+        setTimeout(() => { leyendo = false; }, 2000);
+      });
     }
 
     async function iniciarCamara() {
@@ -89,14 +113,21 @@
       try {
         try { codeReader.reset(); } catch (e) {}
 
-        // Pide directamente la cámara trasera (más confiable que listar dispositivos)
+        const constraints = {
+          video: {
+            facingMode: { ideal: 'environment' },
+            width:  { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        };
+
         await codeReader.decodeFromConstraints(
-          { video: { facingMode: { ideal: 'environment' } } },
+          constraints,
           'video',
           (result, err) => { if (result) manejarResultado(result); }
         );
 
-        setStatus('📸 Cámara activa. Enfoca el QR.', 'text-warning');
+        setStatus('📸 Acerca el QR al recuadro verde (~15-20 cm)', 'text-warning');
         btnIniciar.innerText = '✅ CÁMARA OK';
         btnIniciar.classList.remove('btn-primary');
         btnIniciar.classList.add('btn-success');
@@ -104,44 +135,20 @@
         console.error(err);
         let msg;
         switch (err.name) {
-          case 'NotAllowedError':
-            msg = '❌ Permiso bloqueado. Toca el candado 🔒 en la barra del navegador → Cámara → Permitir, y recarga.';
-            break;
-          case 'NotFoundError':
-            msg = '❌ No se detectó ninguna cámara en este dispositivo.';
-            break;
-          case 'NotReadableError':
-            msg = '❌ La cámara está siendo usada por otra app. Ciérrala y reintenta.';
-            break;
-          case 'SecurityError':
-            msg = '❌ Bloqueada por seguridad. Abre la URL /exec directamente, no embebida.';
-            break;
+          case 'NotAllowedError': msg = '❌ Permiso bloqueado. Toca el candado 🔒 → Cámara → Permitir.'; break;
+          case 'NotFoundError': msg = '❌ No se detectó ninguna cámara.'; break;
+          case 'NotReadableError': msg = '❌ La cámara está siendo usada por otra app.'; break;
           case 'OverconstrainedError':
-            msg = '⚠️ No hay cámara trasera. Probando con cualquier cámara...';
-            setStatus(msg, 'text-warning');
             try {
-              await codeReader.decodeFromConstraints(
-                { video: true },
-                'video',
-                (result, err2) => { if (result) manejarResultado(result); }
-              );
+              await codeReader.decodeFromConstraints({ video: true }, 'video', (r) => { if (r) manejarResultado(r); });
               setStatus('📸 Cámara activa (frontal). Enfoca el QR.', 'text-warning');
-              btnIniciar.innerText = '✅ CÁMARA OK';
-              btnIniciar.classList.remove('btn-primary');
-              btnIniciar.classList.add('btn-success');
-              btnIniciar.disabled = false;
-              return;
-            } catch (e2) {
-              msg = '❌ Sin acceso a cámara: ' + e2.message;
-            }
+              btnIniciar.disabled = false; return;
+            } catch (e2) { msg = '❌ Sin acceso a cámara: ' + e2.message; }
             break;
-          default:
-            msg = '❌ Error: ' + err.name + ' — ' + err.message;
+          default: msg = '❌ ' + err.name + ': ' + err.message;
         }
         setStatus(msg, 'text-danger');
         btnIniciar.innerText = '🔄 REINTENTAR';
-        btnIniciar.classList.remove('btn-success');
-        btnIniciar.classList.add('btn-primary');
       } finally {
         btnIniciar.disabled = false;
       }
@@ -149,13 +156,10 @@
 
     function volver() {
       try { codeReader.reset(); } catch (e) {}
-      // Apagar tracks para liberar la cámara y el LED
       const v = document.getElementById('video');
-      if (v.srcObject) {
-        v.srcObject.getTracks().forEach(t => t.stop());
-        v.srcObject = null;
-      }
-      google.script.run.withSuccessHandler(url => window.top.location.href = url).getAppUrl();
+      if (v.srcObject) { v.srcObject.getTracks().forEach(t => t.stop()); v.srcObject = null; }
+      if (window.history.length > 1) history.back();
+      else window.close();
     }
   </script>
 </body>
