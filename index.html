@@ -33,7 +33,6 @@
     .topbar img { height: 38px; width: auto; background: white; padding: 4px 8px; border-radius: 8px; }
     .topbar-text h1 { margin: 0; font-size: 14px; font-weight: 700; }
     .topbar-text p { margin: 0; font-size: 11px; opacity: 0.7; font-style: italic; }
-    
     .video-container {
       flex: 1; position: relative; background: #000; overflow: hidden; min-height: 50vh;
     }
@@ -57,13 +56,11 @@
     .corner.tr { top: 0; right: 0; border-left: none; border-bottom: none; border-radius: 0 16px 0 0; }
     .corner.bl { bottom: 0; left: 0; border-right: none; border-top: none; border-radius: 0 0 0 16px; }
     .corner.br { bottom: 0; right: 0; border-left: none; border-top: none; border-radius: 0 0 16px 0; }
-    
     .controls {
       background: rgba(13,18,51,0.95); backdrop-filter: blur(20px);
       padding: 20px; padding-bottom: max(20px, env(safe-area-inset-bottom));
       border-top: 1px solid rgba(255,255,255,0.08);
     }
-    
     .status-card {
       background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
       border-radius: 14px; padding: 14px 18px; margin-bottom: 14px;
@@ -75,7 +72,6 @@
     .status-card.danger { background: rgba(239,68,68,0.15); border-color: var(--danger); color: #fca5a5; }
     .status-card.warning { background: rgba(245,158,11,0.12); border-color: var(--warning); color: #fcd34d; }
     .status-card.info { background: rgba(59,130,246,0.15); border-color: var(--info); color: #93c5fd; }
-    
     button {
       width: 100%; font-family: inherit; font-size: 14px; font-weight: 700;
       border: none; border-radius: 12px; padding: 15px;
@@ -92,7 +88,12 @@
       font-size: 12px; padding: 12px;
     }
     .btn-ghost:hover { background: rgba(255,255,255,0.05); color: white; }
-    
+    .btn-rescan {
+      background: rgba(16,185,129,0.15); color: #6ee7b7;
+      border: 1px solid #10b981; margin-top: 10px;
+      font-size: 13px; padding: 13px;
+    }
+    .btn-rescan:hover { background: rgba(16,185,129,0.3); color: white; }
     .hint {
       text-align: center; font-size: 11px; opacity: 0.5; margin-top: 12px;
       letter-spacing: 0.5px;
@@ -125,6 +126,9 @@
     <button id="btnIniciar" class="btn-primary" onclick="iniciarCamara()">
       <i class="fa-solid fa-camera"></i> INICIAR CÁMARA
     </button>
+    <button id="btnRescanear" class="btn-rescan" onclick="rescanear()" style="display:none;">
+      <i class="fa-solid fa-rotate-right"></i> ESCANEAR OTRO
+    </button>
     <button class="btn-ghost" onclick="volver()">
       <i class="fa-solid fa-arrow-left"></i> Volver al registro
     </button>
@@ -132,7 +136,6 @@
   </div>
 
   <script>
-    // 🔧 PEGA AQUÍ TU URL /exec DE APPS SCRIPT
     const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbymj9TZXGFOlM8lO3XqM4VQsufB5I3fYyo0lCG16fuYbsu1eYy9TJB56FIFmqFkWuaRcg/exec";
 
     const hints = new Map();
@@ -142,6 +145,7 @@
 
     const statusEl = document.getElementById('status');
     const btnIniciar = document.getElementById('btnIniciar');
+    const btnRescanear = document.getElementById('btnRescanear');
 
     let leyendo = false, ultimoCodigo = null, ultimoTs = 0;
 
@@ -163,6 +167,13 @@
       statusEl.innerHTML = html;
     }
 
+    function rescanear() {
+      leyendo = false;
+      ultimoCodigo = null;
+      btnRescanear.style.display = 'none';
+      setStatus('<i class="fa-solid fa-camera"></i> <span>Listo, apunta al siguiente QR</span>', 'warning');
+    }
+
     function manejarResultado(result) {
       const ahora = Date.now();
       const texto = result.getText();
@@ -175,6 +186,7 @@
       beep();
       if (navigator.vibrate) navigator.vibrate(120);
       setStatus('<i class="fa-solid fa-spinner fa-spin"></i> <span>Validando ' + texto + '...</span>', 'info');
+      btnRescanear.style.display = 'none';
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -195,10 +207,7 @@
         } else {
           setStatus('<i class="fa-solid fa-circle-xmark"></i> <span>ID desconocido: ' + texto + '</span>', 'danger');
         }
-        setTimeout(() => {
-          leyendo = false;
-          setStatus('<i class="fa-solid fa-camera"></i> <span>Listo para el siguiente</span>', 'warning');
-        }, 2200);
+        setTimeout(() => { btnRescanear.style.display = 'flex'; }, 800);
       })
       .catch(e => {
         clearTimeout(timeoutId);
@@ -206,7 +215,7 @@
           ? 'Servidor no responde. Verifica el Code.gs.'
           : e.message;
         setStatus('<i class="fa-solid fa-triangle-exclamation"></i> <span>' + msg + '</span>', 'danger');
-        setTimeout(() => { leyendo = false; }, 3000);
+        setTimeout(() => { btnRescanear.style.display = 'flex'; }, 800);
       });
     }
 
